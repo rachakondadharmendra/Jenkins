@@ -1,9 +1,8 @@
+**Simplified Setup for Jenkins Server for Short-Term Projects and Experiments**
 
-**Experience Seamless Jenkins Server Deployment for Temporary Projects and Experiments**
+Need a Jenkins server that you can set up quickly, whether it's for your temporary projects or just to experiment? You're in luck, because we've got just what you need!
 
-Are you seeking a conveniently prepared Jenkins server for your temporary projects or experimental ventures? Look no further.
-
-Allow us to present a sample implementation for swift deployment:
+Let me introduce you to a straightforward implementation:
 
 ## Implementation Guide:
 
@@ -75,7 +74,6 @@ docker run --name jenkins -d -p 8080:8080 -p 5000:5000 \
  --privileged \
  --user root \
  --restart always \
- --env-file .env \
  jenkins:v1.0
 ```
 
