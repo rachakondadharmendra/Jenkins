@@ -1,4 +1,4 @@
-#Secure CI/CD Pipeline: DevSecOps Workflow
+# Secure CI/CD Pipeline: DevSecOps Workflow
 
 ![DevSecOps_gif](https://github.com/rachakondadharmendra/Ops-Knowledge-Base/blob/main/Arch-Daigrams/Jenkins_DevSecOps_CI_CD.gif)
 
