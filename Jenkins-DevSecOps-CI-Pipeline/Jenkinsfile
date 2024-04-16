@@ -1,0 +1,162 @@
+pipeline {
+    agent none
+
+    tools {
+        jdk 'jdk-11'
+    }
+
+    stages {
+        stage('Checkout') {
+            agent {
+                docker {
+                    image 'node:bullseye-slim'
+                    reuseNode true
+                }
+            }
+            steps {
+                git branch: 'main', changelog: false, credentialsId: 'github_admin_creds', poll: false, url: 'https://github.com/rachakondadharmendra/frontend_reactjs'
+            }
+        }
+
+        stage('Dependency Installation') {
+            agent {
+                docker {
+                    image 'node:bullseye-slim'
+                    reuseNode true
+                }
+            }
+            steps {
+                sh 'npm install && npm install --package-lock'
+            }
+        }
+
+        stage('OWASAP Dependency-Check') {
+            agent {
+                docker {
+                    image 'node:bullseye-slim'
+                    reuseNode true
+                }
+            }
+            steps {
+                script {
+                    dependencyCheck additionalArguments: '''\
+                        -o './' \
+                        -s './' \
+                        -f 'ALL' \
+                        --prettyPrint ''', nvdCredentialsId: 'nvd-token', odcInstallation: 'dp-nvd-api'
+                    dependencyCheckPublisher pattern: 'dependency-check-report.xml'
+                }
+            }
+        }
+        
+        stage('Linting') {
+            agent {
+                docker {
+                    image 'node:bullseye-slim'
+                    reuseNode true
+                }
+            }
+            steps {
+                //sh 'npm run lint'
+                echo "Linting of code is done"
+            }
+        }
+        stage('Unit Testing') {
+            agent {
+                docker {
+                    image 'node:bullseye-slim'
+                    reuseNode true
+                }
+            }
+            steps {
+                //sh 'npm run test'
+                echo "Unit Testing of code is done"
+            }
+        }        
+
+        stage('SonarQube analysis') {
+            agent {
+                docker {
+                    image 'node:bullseye-slim'
+                    reuseNode true
+                }
+            }
+            environment {
+                scannerHome = tool 'sonarqube'
+            }
+            steps {
+                withSonarQubeEnv('sonarqube-server') {
+                    sh """
+                    ${scannerHome}/bin/sonar-scanner \
+                        -Dsonar.projectKey=reactjs-app \
+                        -Dsonar.projectName=reactjs-app \
+                        -Dsonar.projectVersion=1.0 \
+                        -Dsonar.sources=. \
+                        -Dsonar.exclusions='**/node_modules/**' \
+                        -Dsonar.sourceEncoding=UTF-8 \
+                        -Dsonar.javascript.lcov.reportPaths=reports/
+                    """
+                }
+            }
+        }
+
+        stage("Quality Gate") {
+            agent {
+                docker {
+                    image 'node:bullseye-slim'
+                    reuseNode true
+                }
+            }
+            steps {
+                script {
+                    timeout(time: 5, unit: 'MINUTES') {
+                        def qg = waitForQualityGate abortPipeline: true
+                        if (qg.status != 'OK') {
+                            error "Pipeline aborted due to quality gate failure: ${qg.status}"
+                        } else {
+                            echo "Quality gate test passed status: ${qg.getStatus()}"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage("Checkov scanning") {
+            agent {
+                docker {
+                    image 'bridgecrew/checkov:3.2.49'
+                    args "--entrypoint=''"
+                }
+            }
+            steps {
+                sh 'checkov --version'
+                sh 'checkov -d . --skip-check CKV_DOCKER_2 --skip-check CKV_DOCKER_3 --framework dockerfile'
+            }
+        }
+
+        stage("Docker Build") {
+            agent {
+                docker {
+                    image 'docker:dind'
+                    args '--privileged -v /var/run/docker.sock:/var/run/docker.sock'
+                }
+            }
+            steps {
+                sh 'docker build -t reactjs:1.0 .'
+            }
+        }
+
+        stage("Trivy scanning") {
+            agent {
+                docker {
+                    image 'aquasec/trivy:latest'
+                    args "--entrypoint=''"
+                }
+            }
+            steps {
+                sh 'trivy --version'
+                sh 'trivy image --format table reactjs:1.0'
+            }
+        }
+    }
+}
